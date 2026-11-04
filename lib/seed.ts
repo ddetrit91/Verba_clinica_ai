@@ -1,5 +1,5 @@
-import type Database from "better-sqlite3";
 import { addDays, localStamp, slotTimes, todayIso, weekdayOf } from "./format";
+import { queryAll, queryOne, type Queryable } from "./sql";
 
 type SeedMedic = {
   name: string;
@@ -81,21 +81,9 @@ const PEOPLE: [string, string][] = [
   ["Игорь Лавров", "934445566"],
 ];
 
-export function seed(db: Database.Database) {
-  const count = db.prepare("SELECT COUNT(*) AS count FROM medics").get() as { count: number };
-  if (count.count > 0) return;
-
-  const insertMedic = db.prepare(
-    "INSERT INTO medics (name, specialty, slot_minutes, active) VALUES (?, ?, ?, 1)",
-  );
-  const insertSchedule = db.prepare(
-    "INSERT INTO schedules (medic_id, weekday, start_time, end_time) VALUES (?, ?, ?, ?)",
-  );
-  const insertAppointment = db.prepare(
-    `INSERT INTO appointments
-      (medic_id, date, time, client_name, client_phone, source, telegram_user_id, status, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'booked', ?)`,
-  );
+export async function seed(db: Queryable) {
+  const count = await queryOne<{ count: string }>(db, "SELECT COUNT(*) AS count FROM medics");
+  if (Number(count?.count ?? 0) > 0) return;
 
   const today = todayIso();
   const now = new Date();
@@ -103,12 +91,22 @@ export function seed(db: Database.Database) {
   let personIndex = 0;
   let appointments = 0;
 
-  const fill = db.transaction(() => {
+  await db.query("BEGIN");
+  try {
     for (const medic of SEED_MEDICS) {
-      const result = insertMedic.run(medic.name, medic.specialty, medic.slotMinutes);
-      const medicId = Number(result.lastInsertRowid);
+      const inserted = await queryOne<{ id: number }>(
+        db,
+        "INSERT INTO medics (name, specialty, slot_minutes, active) VALUES (?, ?, ?, 1) RETURNING id",
+        [medic.name, medic.specialty, medic.slotMinutes],
+      );
+      if (!inserted) throw new Error("Медик сида не сохранился");
       for (const interval of medic.schedule) {
-        insertSchedule.run(medicId, interval.weekday, interval.start, interval.end);
+        await queryAll(db, "INSERT INTO schedules (medic_id, weekday, start_time, end_time) VALUES (?, ?, ?, ?)", [
+          inserted.id,
+          interval.weekday,
+          interval.start,
+          interval.end,
+        ]);
       }
 
       const buckets: { date: string; time: string }[][] = [];
@@ -142,21 +140,29 @@ export function seed(db: Database.Database) {
         const [name, phone] = PEOPLE[personIndex % PEOPLE.length];
         personIndex += 1;
         const fromTelegram = personIndex % 5 === 0;
-        insertAppointment.run(
-          medicId,
-          slot.date,
-          slot.time,
-          name,
-          `+998${phone}`,
-          fromTelegram ? "telegram" : "site",
-          fromTelegram ? String(5000 + personIndex) : null,
-          localStamp(),
+        await queryAll(
+          db,
+          `INSERT INTO appointments
+            (medic_id, date, time, client_name, client_phone, source, telegram_user_id, status, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'booked', ?)`,
+          [
+            inserted.id,
+            slot.date,
+            slot.time,
+            name,
+            `+998${phone}`,
+            fromTelegram ? "telegram" : "site",
+            fromTelegram ? String(5000 + personIndex) : null,
+            localStamp(),
+          ],
         );
         appointments += 1;
       }
     }
-  });
-
-  fill();
+    await db.query("COMMIT");
+  } catch (error) {
+    await db.query("ROLLBACK");
+    throw error;
+  }
   console.info(`Сиды клиники «Верба»: ${SEED_MEDICS.length} медиков, ${appointments} заявок`);
 }

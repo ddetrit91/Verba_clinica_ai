@@ -22,8 +22,8 @@ function medicsLabel(count: number) {
   return "медиков";
 }
 
-export default function HomePage() {
-  const medics = listMedics();
+export default async function HomePage() {
+  const medics = await listMedics();
   const today = todayIso();
   const weekday = weekdayOf(today);
   const onDuty = medics.flatMap((medic) => {

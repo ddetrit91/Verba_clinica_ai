@@ -1,4 +1,3 @@
-import { getDb } from "./db";
 import type { Appointment, Medic, ScheduleInterval } from "./types";
 
 export type AppointmentRow = {
@@ -45,20 +44,12 @@ export function mapAppointment(row: AppointmentRow): Appointment {
   };
 }
 
-export function readSchedule(medicId: number): ScheduleInterval[] {
-  return getDb()
-    .prepare(
-      "SELECT weekday, start_time AS start, end_time AS end FROM schedules WHERE medic_id = ? ORDER BY weekday",
-    )
-    .all(medicId) as ScheduleInterval[];
-}
-
-export function mapMedic(row: MedicRow): Medic {
+export function mapMedic(row: MedicRow, schedule: ScheduleInterval[]): Medic {
   return {
     id: row.id,
     name: row.name,
     specialty: row.specialty,
     slotMinutes: row.slot_minutes,
-    schedule: readSchedule(row.id),
+    schedule,
   };
 }

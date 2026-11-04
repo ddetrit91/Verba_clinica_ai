@@ -11,5 +11,5 @@ export async function POST(request: Request) {
   if (!parsedBody.ok) return parsedBody.response;
   const parsed = parseMedicInput(parsedBody.value);
   if (!parsed.ok) return Response.json({ error: parsed.error }, { status: 400 });
-  return Response.json({ medic: createMedic(parsed.value) });
+  return Response.json({ medic: await createMedic(parsed.value) });
 }

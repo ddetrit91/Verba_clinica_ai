@@ -3,7 +3,6 @@ import { AdminDesk } from "@/components/AdminDesk";
 export const dynamic = "force-dynamic";
 
 export default function AdminPage() {
-  const showDemoHint = (process.env.ADMIN_PASSWORD ?? "verba-admin") === "verba-admin";
   return (
     <main id="content">
       <section className="page-hero">
@@ -14,7 +13,7 @@ export default function AdminPage() {
         </div>
       </section>
       <div className="shell page-body">
-        <AdminDesk showDemoHint={showDemoHint} />
+        <AdminDesk />
       </div>
     </main>
   );

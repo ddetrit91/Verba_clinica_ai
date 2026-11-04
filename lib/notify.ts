@@ -8,12 +8,21 @@ function escapeHtml(value: string): string {
     .replaceAll(">", "&gt;");
 }
 
-export async function notifyGroup(appointment: Appointment, kind: "created" | "cancelled"): Promise<void> {
+function clinicChatId(): string | null {
+  const chatId = process.env.TELEGRAM_GROUP_CHAT_ID?.trim() ?? "";
+  return chatId || null;
+}
+
+export async function notifyGroup(appointment: Appointment, kind: "created" | "cancelled"): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
-  const chatId = process.env.TELEGRAM_GROUP_CHAT_ID?.trim();
+  const chatId = clinicChatId();
   if (!token || !chatId) {
     console.warn("Дубль в группу пропущен: нет TELEGRAM_BOT_TOKEN или TELEGRAM_GROUP_CHAT_ID");
-    return;
+    return false;
+  }
+  const botId = token.split(":")[0];
+  if (chatId === botId) {
+    console.error("TELEGRAM_GROUP_CHAT_ID совпадает с id бота. Сообщение всё равно отправляется на это значение.");
   }
 
   const title = kind === "created" ? `Новая заявка №${appointment.id}` : `Отмена заявки №${appointment.id}`;
@@ -39,9 +48,19 @@ export async function notifyGroup(appointment: Appointment, kind: "created" | "c
     });
     if (!response.ok) {
       const body = await response.text();
-      console.error("Не удалось отправить дубль в группу", response.status, body);
+      let description = "";
+      try {
+        description = String((JSON.parse(body) as { description?: string }).description ?? "");
+      } catch {
+        description = "";
+      }
+      console.error("Не удалось отправить дубль в чат TELEGRAM_GROUP_CHAT_ID", response.status, description);
+      return false;
     }
+    return true;
   } catch (error) {
-    console.error("Не удалось отправить дубль в группу", error);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Не удалось отправить дубль в чат TELEGRAM_GROUP_CHAT_ID", message.replace(/bot\d+:[A-Za-z0-9_-]+/g, "bot[redacted]"));
+    return false;
   }
 }

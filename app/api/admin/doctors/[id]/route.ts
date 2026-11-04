@@ -14,7 +14,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (!parsedBody.ok) return parsedBody.response;
   const parsed = parseMedicInput(parsedBody.value);
   if (!parsed.ok) return Response.json({ error: parsed.error }, { status: 400 });
-  const medic = updateMedic(medicId, parsed.value);
+  const medic = await updateMedic(medicId, parsed.value);
   if (!medic) return Response.json({ error: "Медик не найден" }, { status: 404 });
   return Response.json({ medic });
 }

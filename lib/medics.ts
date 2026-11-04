@@ -1,22 +1,47 @@
-import { getDb } from "./db";
+import { all, one, tx } from "./db";
 import { isTime, slotTimes, toMinutes } from "./format";
 import { mapMedic, type MedicRow } from "./rows";
+import { queryAll, queryOne, type Queryable } from "./sql";
 import type { Medic, MedicInput, ScheduleInterval } from "./types";
 
 const SLOT_MINUTES = new Set([20, 30, 40, 60]);
 
-export function listMedics(): Medic[] {
-  const rows = getDb()
-    .prepare("SELECT id, name, specialty, slot_minutes FROM medics WHERE active = 1 ORDER BY id")
-    .all() as MedicRow[];
-  return rows.map(mapMedic);
+type ScheduleRow = ScheduleInterval & { medic_id: number };
+
+async function schedulesByMedic(medicIds: number[]): Promise<Map<number, ScheduleInterval[]>> {
+  const grouped = new Map<number, ScheduleInterval[]>();
+  if (medicIds.length === 0) return grouped;
+  const rows = await all<ScheduleRow>(
+    `SELECT medic_id, weekday, start_time AS start, end_time AS end
+     FROM schedules
+     WHERE medic_id = ANY(?::int[])
+     ORDER BY weekday`,
+    [medicIds],
+  );
+  for (const row of rows) {
+    const list = grouped.get(row.medic_id) ?? [];
+    list.push({ weekday: row.weekday, start: row.start, end: row.end });
+    grouped.set(row.medic_id, list);
+  }
+  return grouped;
 }
 
-export function getMedic(id: number): Medic | null {
-  const row = getDb()
-    .prepare("SELECT id, name, specialty, slot_minutes FROM medics WHERE id = ? AND active = 1")
-    .get(id) as MedicRow | undefined;
-  return row ? mapMedic(row) : null;
+export async function listMedics(): Promise<Medic[]> {
+  const rows = await all<MedicRow>(
+    "SELECT id, name, specialty, slot_minutes FROM medics WHERE active = 1 ORDER BY id",
+  );
+  const schedules = await schedulesByMedic(rows.map((row) => row.id));
+  return rows.map((row) => mapMedic(row, schedules.get(row.id) ?? []));
+}
+
+export async function getMedic(id: number): Promise<Medic | null> {
+  const row = await one<MedicRow>(
+    "SELECT id, name, specialty, slot_minutes FROM medics WHERE id = ? AND active = 1",
+    [id],
+  );
+  if (!row) return null;
+  const schedules = await schedulesByMedic([id]);
+  return mapMedic(row, schedules.get(id) ?? []);
 }
 
 export function parseMedicInput(body: unknown): { ok: true; value: MedicInput } | { ok: false; error: string } {
@@ -57,48 +82,50 @@ export function parseMedicInput(body: unknown): { ok: true; value: MedicInput } 
   return { ok: true, value: { name, specialty, slotMinutes, schedule } };
 }
 
-function writeMedic(id: number, input: MedicInput) {
-  const db = getDb();
-  const save = db.transaction(() => {
-    db.prepare("UPDATE medics SET name = ?, specialty = ?, slot_minutes = ? WHERE id = ?").run(
-      input.name,
-      input.specialty,
-      input.slotMinutes,
+async function writeSchedule(db: Queryable, id: number, input: MedicInput) {
+  await db.query(toPgUpdateMedic(), [input.name, input.specialty, input.slotMinutes, id]);
+  await queryAll(db, "DELETE FROM schedules WHERE medic_id = ?", [id]);
+  for (const interval of input.schedule) {
+    await queryAll(db, "INSERT INTO schedules (medic_id, weekday, start_time, end_time) VALUES (?, ?, ?, ?)", [
       id,
-    );
-    db.prepare("DELETE FROM schedules WHERE medic_id = ?").run(id);
-    const insert = db.prepare(
-      "INSERT INTO schedules (medic_id, weekday, start_time, end_time) VALUES (?, ?, ?, ?)",
-    );
-    for (const interval of input.schedule) {
-      insert.run(id, interval.weekday, interval.start, interval.end);
-    }
-  });
-  save();
+      interval.weekday,
+      interval.start,
+      interval.end,
+    ]);
+  }
 }
 
-export function createMedic(input: MedicInput): Medic {
-  const db = getDb();
-  const insert = db.transaction(() => {
-    const result = db
-      .prepare("INSERT INTO medics (name, specialty, slot_minutes, active) VALUES (?, ?, ?, 1)")
-      .run(input.name, input.specialty, input.slotMinutes);
-    const id = Number(result.lastInsertRowid);
-    const add = db.prepare(
-      "INSERT INTO schedules (medic_id, weekday, start_time, end_time) VALUES (?, ?, ?, ?)",
+function toPgUpdateMedic(): string {
+  return "UPDATE medics SET name = $1, specialty = $2, slot_minutes = $3 WHERE id = $4";
+}
+
+export async function createMedic(input: MedicInput): Promise<Medic> {
+  const id = await tx(async (db) => {
+    const row = await queryOne<{ id: number }>(
+      db,
+      "INSERT INTO medics (name, specialty, slot_minutes, active) VALUES (?, ?, ?, 1) RETURNING id",
+      [input.name, input.specialty, input.slotMinutes],
     );
+    if (!row) throw new Error("Медик не сохранился");
     for (const interval of input.schedule) {
-      add.run(id, interval.weekday, interval.start, interval.end);
+      await queryAll(db, "INSERT INTO schedules (medic_id, weekday, start_time, end_time) VALUES (?, ?, ?, ?)", [
+        row.id,
+        interval.weekday,
+        interval.start,
+        interval.end,
+      ]);
     }
-    return id;
+    return row.id;
   });
-  const medic = getMedic(insert());
+  const medic = await getMedic(id);
   if (!medic) throw new Error("Медик не сохранился");
   return medic;
 }
 
-export function updateMedic(id: number, input: MedicInput): Medic | null {
-  if (!getMedic(id)) return null;
-  writeMedic(id, input);
+export async function updateMedic(id: number, input: MedicInput): Promise<Medic | null> {
+  if (!(await getMedic(id))) return null;
+  await tx(async (db) => {
+    await writeSchedule(db, id, input);
+  });
   return getMedic(id);
 }

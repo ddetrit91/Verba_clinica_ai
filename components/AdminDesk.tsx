@@ -30,7 +30,7 @@ function draftsFrom(schedule: ScheduleInterval[]): DayDraft[] {
   return drafts;
 }
 
-export function AdminDesk({ showDemoHint }: { showDemoHint: boolean }) {
+export function AdminDesk() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [password, setPassword] = useState("");
   const [report, setReport] = useState<Report | null>(null);
@@ -156,7 +156,6 @@ export function AdminDesk({ showDemoHint }: { showDemoHint: boolean }) {
             required
           />
         </label>
-        {showDemoHint ? <p className="note">Локальный пароль: verba-admin</p> : null}
         {error ? <p className="error">{error}</p> : null}
         <button className="btn" type="submit">
           Войти

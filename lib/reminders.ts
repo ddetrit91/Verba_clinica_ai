@@ -1,5 +1,5 @@
 import { clinic } from "./clinic";
-import { getDb } from "./db";
+import { all, one } from "./db";
 import { addDays, formatWhen, todayIso } from "./format";
 import { APPOINTMENT_SELECT, mapAppointment, type AppointmentRow } from "./rows";
 import type { Appointment } from "./types";
@@ -92,80 +92,76 @@ export async function deliverReminder(
   }
 }
 
-function markReminder(id: number, kind: ReminderKind, state: number) {
+async function markReminder(id: number, kind: ReminderKind, state: number) {
   const column = kind === "hour" ? "reminder_hour_sent" : "reminder_soon_sent";
-  getDb().prepare(`UPDATE appointments SET ${column} = ? WHERE id = ?`).run(state, id);
+  await one(`UPDATE appointments SET ${column} = ? WHERE id = ?`, [state, id]);
 }
 
-function noteFailure(id: number, kind: ReminderKind, retry: boolean) {
+async function noteFailure(id: number, kind: ReminderKind, retry: boolean) {
   const sentColumn = kind === "hour" ? "reminder_hour_sent" : "reminder_soon_sent";
   const triesColumn = kind === "hour" ? "reminder_hour_tries" : "reminder_soon_tries";
-  const row = getDb().prepare(`SELECT ${triesColumn} AS tries FROM appointments WHERE id = ?`).get(id) as
-    | { tries: number }
-    | undefined;
+  const row = await one<{ tries: number }>(`SELECT ${triesColumn} AS tries FROM appointments WHERE id = ?`, [id]);
   const tries = (row?.tries ?? 0) + 1;
   if (!retry || tries >= MAX_TRIES) {
-    getDb().prepare(`UPDATE appointments SET ${sentColumn} = 2, ${triesColumn} = ? WHERE id = ?`).run(tries, id);
+    await one(`UPDATE appointments SET ${sentColumn} = 2, ${triesColumn} = ? WHERE id = ?`, [tries, id]);
     console.error(`Напоминание ${kind} для заявки ${id} больше не повторяем (попыток: ${tries}).`);
     return;
   }
-  getDb().prepare(`UPDATE appointments SET ${triesColumn} = ? WHERE id = ?`).run(tries, id);
+  await one(`UPDATE appointments SET ${triesColumn} = ? WHERE id = ?`, [tries, id]);
 }
 
-function skipUnreal(row: DueRow) {
-  getDb()
-    .prepare(
-      `UPDATE appointments
-       SET reminder_hour_sent = CASE WHEN reminder_hour_sent = 0 THEN 2 ELSE reminder_hour_sent END,
-           reminder_soon_sent = CASE WHEN reminder_soon_sent = 0 THEN 2 ELSE reminder_soon_sent END
-       WHERE id = ?`,
-    )
-    .run(row.id);
+async function skipUnreal(row: DueRow) {
+  await one(
+    `UPDATE appointments
+     SET reminder_hour_sent = CASE WHEN reminder_hour_sent = 0 THEN 2 ELSE reminder_hour_sent END,
+         reminder_soon_sent = CASE WHEN reminder_soon_sent = 0 THEN 2 ELSE reminder_soon_sent END
+     WHERE id = ?`,
+    [row.id],
+  );
 }
 
-function dueAppointments(now: Date): DueRow[] {
+async function dueAppointments(now: Date): Promise<DueRow[]> {
   const today = todayIso(now);
   const tomorrow = addDays(today, 1);
-  return getDb()
-    .prepare(
-      `${DUE_SELECT}
-       WHERE a.status = 'booked'
-         AND a.telegram_user_id IS NOT NULL
-         AND a.date >= ? AND a.date <= ?
-         AND (a.reminder_hour_sent = 0 OR a.reminder_soon_sent = 0)
-       ORDER BY a.date, a.time`,
-    )
-    .all(today, tomorrow) as DueRow[];
+  return all<DueRow>(
+    `${DUE_SELECT}
+     WHERE a.status = 'booked'
+       AND a.telegram_user_id IS NOT NULL
+       AND a.date >= ? AND a.date <= ?
+       AND (a.reminder_hour_sent = 0 OR a.reminder_soon_sent = 0)
+     ORDER BY a.date, a.time`,
+    [today, tomorrow],
+  );
 }
 
 async function sendKind(row: DueRow, kind: ReminderKind, now: Date) {
   const appointment = mapAppointment(row);
   const result = await deliverReminder(appointment, kind, now);
   if (result.ok) {
-    markReminder(row.id, kind, 1);
+    await markReminder(row.id, kind, 1);
     console.info(`Напоминание ${kind} отправлено, заявка ${row.id}`);
     return;
   }
-  noteFailure(row.id, kind, result.retry);
+  await noteFailure(row.id, kind, result.retry);
 }
 
 export async function runDueReminders(now = new Date()): Promise<void> {
   if (ticking) return;
   ticking = true;
   try {
-    for (const row of dueAppointments(now)) {
+    for (const row of await dueAppointments(now)) {
       if (!isRealTelegramUserId(row.telegram_user_id)) {
-        skipUnreal(row);
+        await skipUnreal(row);
         continue;
       }
       const left = minutesUntilStart(row.date, row.time, now);
       if (left <= 0) {
-        if (row.reminder_hour_sent === 0) markReminder(row.id, "hour", 2);
-        if (row.reminder_soon_sent === 0) markReminder(row.id, "soon", 2);
+        if (row.reminder_hour_sent === 0) await markReminder(row.id, "hour", 2);
+        if (row.reminder_soon_sent === 0) await markReminder(row.id, "soon", 2);
         continue;
       }
       if (left <= 5) {
-        if (row.reminder_hour_sent === 0) markReminder(row.id, "hour", 2);
+        if (row.reminder_hour_sent === 0) await markReminder(row.id, "hour", 2);
         if (row.reminder_soon_sent === 0) await sendKind(row, "soon", now);
         continue;
       }
@@ -183,7 +179,7 @@ export async function runDueReminders(now = new Date()): Promise<void> {
 export async function sendManualReminder(
   id: number,
 ): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
-  const row = getDb().prepare(`${APPOINTMENT_SELECT} WHERE a.id = ?`).get(id) as AppointmentRow | undefined;
+  const row = await one<AppointmentRow>(`${APPOINTMENT_SELECT} WHERE a.id = ?`, [id]);
   if (!row) return { ok: false, error: "Заявка не найдена", status: 404 };
   const appointment = mapAppointment(row);
   if (appointment.status !== "booked") {
