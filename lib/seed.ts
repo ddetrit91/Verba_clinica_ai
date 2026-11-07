@@ -1,4 +1,5 @@
 import { addDays, localStamp, slotTimes, todayIso, weekdayOf } from "./format";
+import { photoForMedic } from "./medic-photos";
 import { queryAll, queryOne, type Queryable } from "./sql";
 
 type SeedMedic = {
@@ -96,8 +97,8 @@ export async function seed(db: Queryable) {
     for (const medic of SEED_MEDICS) {
       const inserted = await queryOne<{ id: number }>(
         db,
-        "INSERT INTO medics (name, specialty, slot_minutes, active) VALUES (?, ?, ?, 1) RETURNING id",
-        [medic.name, medic.specialty, medic.slotMinutes],
+        "INSERT INTO medics (name, specialty, slot_minutes, active, photo) VALUES (?, ?, ?, 1, ?) RETURNING id",
+        [medic.name, medic.specialty, medic.slotMinutes, photoForMedic(medic.name)],
       );
       if (!inserted) throw new Error("Медик сида не сохранился");
       for (const interval of medic.schedule) {

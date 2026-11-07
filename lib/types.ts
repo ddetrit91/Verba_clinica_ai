@@ -9,6 +9,7 @@ export type Medic = {
   name: string;
   specialty: string;
   slotMinutes: number;
+  photo: string | null;
   schedule: ScheduleInterval[];
 };
 

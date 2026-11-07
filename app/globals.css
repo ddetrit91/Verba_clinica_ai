@@ -272,12 +272,17 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .visual-panel strong, .float-card strong { display: block; }
 .visual-panel a {
   display: grid;
-  gap: 0.1rem;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.65rem;
+  row-gap: 0.05rem;
+  align-items: center;
   padding: 0.55rem 0.65rem;
   border-radius: 0.8rem;
   text-decoration: none;
   color: inherit;
 }
+.visual-panel a .medic-face { grid-row: 1 / span 2; }
+.visual-panel a strong, .visual-panel a span { grid-column: 2; }
 .visual-panel a:hover { background: rgba(37, 99, 235, 0.18); }
 .float-card { padding: 0.8rem 1rem; }
 
@@ -379,7 +384,25 @@ html.light .ticker { background: #eff6ff; color: #1e3a8a; }
   text-decoration: none;
   color: inherit;
 }
-.person { grid-template-columns: 1.3fr 1fr auto; }
+.person { grid-template-columns: auto 1.3fr 1fr auto; align-items: center; }
+.medic-face { display: block; object-fit: cover; object-position: center 18%; background: #1e293b; }
+.medic-face.is-card { width: 100%; aspect-ratio: 4 / 5; }
+.medic-face.is-row, .medic-face.is-pick { width: 2.75rem; height: 2.75rem; border-radius: 999px; }
+.medic-face.is-fallback {
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: #2563eb;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.medic-card { padding: 0; overflow: hidden; }
+.medic-copy { padding: 1rem 1.2rem 1.2rem; display: grid; gap: 0.35rem; }
+.medic-banner { display: grid; grid-template-columns: auto 1fr; gap: 0.8rem; align-items: center; margin-bottom: 0.8rem; }
+.medic-banner h2, .medic-banner p { margin: 0; }
+.medic-pick { padding: 0.7rem; display: grid; grid-template-columns: auto 1fr; column-gap: 0.7rem; align-items: center; }
+.medic-pick .medic-face { grid-row: 1 / span 3; }
+.medic-pick strong, .medic-pick span, .medic-pick small { grid-column: 2; }
 .person:hover { color: var(--blue-2); }
 .table-row { grid-template-columns: 6rem 1.2fr 1fr 1fr auto auto; }
 
@@ -405,13 +428,13 @@ html.light .ticker { background: #eff6ff; color: #1e3a8a; }
   cursor: pointer;
   border-radius: 0.9rem;
 }
-.medic-pick { padding: 0.85rem; display: grid; gap: 0.1rem; }
+.medic-pick { padding: 0.7rem 0.85rem; display: grid; grid-template-columns: auto 1fr; column-gap: 0.7rem; row-gap: 0.05rem; align-items: center; }
 .medic-pick[aria-pressed="true"], .slot[aria-pressed="true"], .day[data-state="selected"] {
   background: var(--blue);
   color: white;
   border-color: var(--blue);
 }
-.medic-pick small { color: var(--muted); }
+.medic-pick small { color: var(--muted); grid-column: 2; }
 .medic-pick[aria-pressed="true"] small, .day[data-state="selected"] small { color: inherit; }
 .month-bar { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
 .month-bar h2 { margin: 0; font-size: 1.6rem; }
@@ -434,7 +457,9 @@ input, select {
   border-radius: 0.75rem;
   padding: 0.7rem 0.75rem;
 }
-.summary { display: grid; gap: 0.3rem; border-top: 2px solid var(--blue); padding-top: 0.8rem; }
+.summary { display: grid; grid-template-columns: auto 1fr; gap: 0.35rem 0.8rem; align-items: center; border-top: 2px solid var(--blue); padding-top: 0.8rem; }
+.summary .medic-face { grid-row: 1 / span 4; }
+.summary h2, .summary p, .summary .btn { grid-column: 2; }
 .load-row { padding: 1rem; margin-bottom: 0.7rem; }
 .load-top { display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 0.45rem; }
 .meter { height: 0.5rem; background: var(--track); border-radius: 999px; overflow: hidden; }

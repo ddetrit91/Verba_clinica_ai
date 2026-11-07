@@ -28,7 +28,7 @@ async function schedulesByMedic(medicIds: number[]): Promise<Map<number, Schedul
 
 export async function listMedics(): Promise<Medic[]> {
   const rows = await all<MedicRow>(
-    "SELECT id, name, specialty, slot_minutes FROM medics WHERE active = 1 ORDER BY id",
+    "SELECT id, name, specialty, slot_minutes, photo FROM medics WHERE active = 1 ORDER BY id",
   );
   const schedules = await schedulesByMedic(rows.map((row) => row.id));
   return rows.map((row) => mapMedic(row, schedules.get(row.id) ?? []));
@@ -36,7 +36,7 @@ export async function listMedics(): Promise<Medic[]> {
 
 export async function getMedic(id: number): Promise<Medic | null> {
   const row = await one<MedicRow>(
-    "SELECT id, name, specialty, slot_minutes FROM medics WHERE id = ? AND active = 1",
+    "SELECT id, name, specialty, slot_minutes, photo FROM medics WHERE id = ? AND active = 1",
     [id],
   );
   if (!row) return null;

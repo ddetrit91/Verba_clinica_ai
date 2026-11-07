@@ -20,6 +20,7 @@ export type MedicRow = {
   name: string;
   specialty: string;
   slot_minutes: number;
+  photo: string | null;
 };
 
 export const APPOINTMENT_SELECT = `SELECT a.id, a.medic_id, m.name AS medic_name, m.specialty, a.date, a.time,
@@ -50,6 +51,7 @@ export function mapMedic(row: MedicRow, schedule: ScheduleInterval[]): Medic {
     name: row.name,
     specialty: row.specialty,
     slotMinutes: row.slot_minutes,
+    photo: row.photo,
     schedule,
   };
 }

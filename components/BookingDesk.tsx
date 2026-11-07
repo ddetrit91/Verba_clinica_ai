@@ -16,6 +16,7 @@ import {
 } from "@/lib/format";
 import type { Appointment, DayCell, Medic, Slot } from "@/lib/types";
 import type { TelegramBookingLink } from "@/components/TelegramBooking";
+import { MedicFace } from "@/components/MedicFace";
 
 type DayState = "free" | "full" | "off" | "past" | "closed" | "selected";
 
@@ -226,6 +227,7 @@ export function BookingDesk({ telegram = null }: { telegram?: TelegramBookingLin
               aria-pressed={item.id === medicId}
               onClick={() => chooseMedic(item.id)}
             >
+              <MedicFace name={item.name} photo={item.photo} size="pick" />
               <strong>{item.name}</strong>
               <span>{item.specialty}</span>
               <small>{formatSchedule(item.schedule)}</small>
@@ -243,6 +245,7 @@ export function BookingDesk({ telegram = null }: { telegram?: TelegramBookingLin
         </ol>
         {done && medic ? (
           <div className="summary">
+            <MedicFace name={medic.name} photo={medic.photo} size="pick" />
             <h2>Заявка {done.id} принята</h2>
             <p>
               {medic.name}, {medic.specialty}
@@ -257,6 +260,15 @@ export function BookingDesk({ telegram = null }: { telegram?: TelegramBookingLin
           </div>
         ) : (
           <>
+            {medic ? (
+            <div className="medic-banner">
+              <MedicFace name={medic.name} photo={medic.photo} size="pick" />
+              <div>
+                <h2>{medic.name}</h2>
+                <p>{medic.specialty}</p>
+              </div>
+            </div>
+            ) : null}
             {medic ? (
             <div className="month-bar">
               <h2>{formatMonthTitle(cursor.year, cursor.month)}</h2>

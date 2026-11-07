@@ -1,5 +1,6 @@
 import { Pool, type PoolConfig } from "pg";
 import { attachDatabasePool } from "@vercel/functions";
+import { MEDIC_PHOTOS } from "./medic-photos";
 import { seed } from "./seed";
 import { queryAll, queryOne, type Queryable } from "./sql";
 
@@ -43,7 +44,8 @@ async function migrate(db: Queryable) {
       name TEXT NOT NULL,
       specialty TEXT NOT NULL,
       slot_minutes INTEGER NOT NULL,
-      active INTEGER NOT NULL DEFAULT 1
+      active INTEGER NOT NULL DEFAULT 1,
+      photo TEXT
     );
 
     CREATE TABLE IF NOT EXISTS schedules (
@@ -77,6 +79,8 @@ async function migrate(db: Queryable) {
     ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reminder_hour_tries INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reminder_soon_tries INTEGER NOT NULL DEFAULT 0;
 
+    ALTER TABLE medics ADD COLUMN IF NOT EXISTS photo TEXT;
+
     CREATE TABLE IF NOT EXISTS bot_sessions (
       key TEXT PRIMARY KEY,
       value JSONB NOT NULL,
@@ -89,6 +93,9 @@ async function migrate(db: Queryable) {
     WHERE client_phone LIKE '+7%';
   `);
   await seed(db);
+  for (const [name, photo] of Object.entries(MEDIC_PHOTOS)) {
+    await db.query("UPDATE medics SET photo = $1 WHERE name = $2 AND (photo IS NULL OR photo = '')", [photo, name]);
+  }
 }
 
 async function ensureReady(): Promise<void> {

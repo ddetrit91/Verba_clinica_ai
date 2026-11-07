@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { HeroParallax } from "@/components/HeroParallax";
+import { MedicFace } from "@/components/MedicFace";
 import { Reveal } from "@/components/Reveal";
 import { clinic } from "@/lib/clinic";
 import { listMedics } from "@/lib/medics";
@@ -72,6 +73,7 @@ export default async function HomePage() {
               {onDuty.length === 0 ? <strong>Приёма нет</strong> : null}
               {onDuty.map((medic) => (
                 <Link href={`/book?medic=${medic.id}`} key={medic.id}>
+                  <MedicFace name={medic.name} photo={medic.photo} size="row" />
                   <strong>{medic.name}</strong>
                   <span>
                     {medic.specialty}, {medic.start}–{medic.end}
@@ -112,6 +114,7 @@ export default async function HomePage() {
             {onDuty.length === 0 ? <p>Сегодня приёма нет.</p> : null}
             {onDuty.map((medic) => (
               <Link className="person" href={`/book?medic=${medic.id}`} key={medic.id}>
+                <MedicFace name={medic.name} photo={medic.photo} size="row" />
                 <strong>{medic.name}</strong>
                 <span>{medic.specialty}</span>
                 <span>
@@ -160,11 +163,14 @@ export default async function HomePage() {
           </div>
           <div className="card-grid">
             {medics.map((medic) => (
-              <article className="info-card" key={medic.id}>
-                <h3>{medic.name}</h3>
-                <p>{medic.specialty}</p>
-                <p className="muted">{formatSchedule(medic.schedule)}</p>
-                <Link href={`/book?medic=${medic.id}`}>Выбрать время</Link>
+              <article className="info-card medic-card" key={medic.id}>
+                <MedicFace name={medic.name} photo={medic.photo} />
+                <div className="medic-copy">
+                  <h3>{medic.name}</h3>
+                  <p>{medic.specialty}</p>
+                  <p className="muted">{formatSchedule(medic.schedule)}</p>
+                  <Link href={`/book?medic=${medic.id}`}>Выбрать время</Link>
+                </div>
               </article>
             ))}
           </div>

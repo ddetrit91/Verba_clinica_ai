@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { WEEKDAY_ORDER, WEEKDAY_SHORT, formatDay, formatPhone, formatSchedule } from "@/lib/format";
+import { MedicFace } from "@/components/MedicFace";
 import type { Appointment, Medic, ScheduleInterval } from "@/lib/types";
 
 type LoadMedic = Medic & {
@@ -317,6 +318,7 @@ export function AdminDesk() {
         <h2 id="roster">Кто уже в расписании</h2>
         {report?.medics.map((medic) => (
           <div className="person" key={medic.id}>
+            <MedicFace name={medic.name} photo={medic.photo} size="row" />
             <strong>{medic.name}</strong>
             <span>
               {medic.specialty}, {medic.slotMinutes} мин
